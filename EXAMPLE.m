@@ -4,8 +4,9 @@
 % Code by Zhe Bai
 % For Paper, "Dynamic mode decomposition for compressive system identification"
 % by Z. Bai, E. Kaiser, J. L. Proctor, J. N. Kutz and S. L. Brunton.
+% https://arc.aiaa.org/doi/pdf/10.2514/1.J057870
 
-% Example: stochastically forced linear system
+% Example: stochastically forced linear system 
 
 % Actuation matrix B:
 % 1. in the span of P (projection matrix);
@@ -33,33 +34,41 @@ outpath = './output/';
 %% generate data
 n = 1024;               % dimension of states
 p = 128;                % dimension of compressed measurements
-dt = 0.1;
+dt = 0.1;               % time step
 tspan = [0:dt:30];      % time span
 nt = numel(tspan);      % number of time steps
 rng(1);                 % fix random generator
+
+
+% ------- A and B matrix -----------
 Atilde = [0.9  0.2; -0.1  0.9]; % dynamics
 Btilde = [0.1; 0.01];   % actuation matrix
+% ----------------------------------
+
 
 for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     
     for CType = 1    % 1-unifrom, 2-gaussian 3-single pixel
     % get two-dimensional system
-    xtilde = [0.25; 0.25];   % initial condition
-    Upsilon = zeros(1, nt);
+    xtilde = [0.25; 0.25];   % initial condition since i have 2 states
+    Upsilon = zeros(1, nt);  % input vector
     for tk = 1:nt
-        Upsilon(tk) = randn; % generate random input vector
-        xtilde(:, tk+1) = Atilde*xtilde(:,tk) + Btilde*(Upsilon(tk));
+        Upsilon(tk) = randn;                                                % generate random stoachstic input vector
+        xtilde(:, tk+1) = Atilde*xtilde(:,tk) + Btilde*(Upsilon(tk));       % update state tilde, Derivative of my systems
     end
     
+    % The originaol state is at 2 dim, but to show the efficiency, the states are brought up to 1024 dim, so with 1024 states
     % projection matrix
     p1 = zeros(n, 1); p1(3) = 1; p1(29) = 1; p1 = p1/norm(p1);
     p2 = zeros(n, 1); p2(11) = 1.5; p2(47) = 1; p2 = p2/norm(p2);
     P = idct2([p1 p2]); % orthogonal columns of P
     
-    % true A
+    % true A -> or inflated P :
+    % Original A -> 2*2 , new A -> 1024*1024
     A = P*Atilde*(pinv(P));
     
     % generate B matrix: three cases
+    % Original B -> 2*1 , new B -> 1024*1
     if B_choice == 1
         B = P*Btilde; % 1. span of P
         B_name = '_sub';
@@ -106,7 +115,7 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     % unifrom distribution
     if CType == 1
         C = randn(p,n);
-        % grassian distribution
+        % gaussian distribution
     elseif CType == 2 
         C = rand(p,n);
         %   single pixel measurement
