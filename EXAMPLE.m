@@ -53,9 +53,17 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     xtilde = [0.25; 0.25];   % initial condition since i have 2 states
     Upsilon = zeros(1, nt);  % input vector
     for tk = 1:nt
-        Upsilon(tk) = randn;                                                % generate random stoachstic input vector
+        Upsilon(tk) = randn;                                                % generate random gaussian stoachstic input vector
         xtilde(:, tk+1) = Atilde*xtilde(:,tk) + Btilde*(Upsilon(tk));       % update state tilde, Derivative of my systems
     end
+
+    % PLot the original state in tspan
+    figure;
+    plot(tspan, xtilde(1,1:end-1), 'b', 'LineWidth', 2); hold on
+    plot(tspan, xtilde(2,1:end-1), 'r', 'LineWidth', 2); hold on
+    xlabel('Time', 'FontSize', 16); ylabel('State', 'FontSize', 16);
+    legend('x_1', 'x_2', 'FontSize', 16);
+    title('Original State', 'FontSize', 16);
     
     % The originaol state is at 2 dim, but to show the efficiency, the states are brought up to 1024 dim, so with 1024 states
     % projection matrix
@@ -89,11 +97,23 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     for tk = 1:nt
         X(:,tk+1) = A*X(:,tk) + B*Upsilon(tk);
     end
+    % X is the high dimensional state in 1024 dimensional states over the tspan
+    % so [1024 * 302 ] 
     
+    % ---------------------------------------------
     %% real dynamics
+    % eigenvalue decomposition 
+    % T: eigenvectors
+    % DA: eigenvalues
     [T,DA] = eig(A);
+    % But i am only interested in the first two eigenvalues, since my original system is 2 dimensional
     T = T(:, 1:2);
     DA = DA(1:2, 1:2);
+    disp('AS you can see the eigenvalues are very close to the original A')
+    DA
+    eig(Atilde)
+
+    % ---------------------------
     
     %% DMDc
     if B_choice == 1  % B is in the span of P
@@ -102,6 +122,9 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
         r = 3;        % B is not in the span of P
     end
     rtilde = r + 1;
+
+    % X1 and X2 projected to the span of P
+    % 2 different snapshots of the system evolved over the tspan
     X1 = X(:, 1:end-1);
     X2 = X(:, 2:end);
     
@@ -111,7 +134,13 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     % B unknown
     [D02, Phi02, Bhat02] = func_DMDc(X1, X2, Upsilon, r, rtilde);
     
-    %% cDMDc
+    %% cDMDc 
+    % though in our augmented system we have 1024 states, but we are only interested in the first two states
+    % usually we do not have 1024 sensor, and sometimes they vary in different ways. So by using a compressed observable state
+    % we can get the compressed measurements to obtained a new measurements
+
+    % C is the compressed observable state
+    
     % unifrom distribution
     if CType == 1
         C = randn(p,n);
@@ -128,10 +157,18 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     end
     
     %% compressed measurements
+    % X is the compressed observable state  [ 1024*302]
+    % Y is the compressed measurements state [ 128*302]
     Y = C*X; % compress X to get Y
     Y1 = Y(:, 1:end-1);
     Y2 = Y(:, 2:end); % shift matrix
     
+    % Resuming: 
+    % X1 and X2 are 2 snapshots of the system evolved over the tspan with 1024 states
+    % Y1 and Y2 are 2 snapshots of the system evolved over the tspan with 128 states
+
+    % GOal: obtain a compressed DMDc model
+
     %% test four cases
     % 1. X known, B known
     [D11, Phi11] = func_cDMDc(Y1, Y2, C, Upsilon, r, rtilde, X1, X2, B, '1');
@@ -145,6 +182,21 @@ for B_choice = 1     % 1-sub, 2-randn or 3-nonsub
     % 4. X unknown, B unknown
     [D22, Phi22, Bhat22] = func_cDMDc(Y1, Y2, C, Upsilon, r, rtilde, [], [], [], '4');
     
+
+    % what are D and Phi ? 
+    % D is the eigenvalues of the system
+    % Phi is the eigenvectors of the system
+
+    % usine spectral analysis, compute matric A from D11 and Phi11
+    % you cannot since Phi11 has to be square. 
+
+    % Compute a time history from eigenvalues and eigenvectors
+    % Phi11 is the eigenvectors of the system
+    % D11 is the eigenvalues of the system
+    % X1 is the initial condition of the system
+    % Upsilon is the input of the system
+    % B is the input matrix of the system
+
     %% normalize modes
     T = normalize(T);
     Phi01 = normalize(Phi01); Phi02 = normalize(Phi02);
